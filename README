@@ -1,0 +1,8 @@
+install
+http://sdkman.io/
+
+install gradle:
+sdk install gradle
+
+follow instructions:
+https://developers.google.com/gmail/api/quickstart/java
