@@ -16,3 +16,6 @@ https://developers.google.com/gmail/api/v1/reference/users/messages
 
 Push Notifications
 https://developers.google.com/gmail/api/guides/push
+
+TODO:
+mark messages as read after they are processed.
