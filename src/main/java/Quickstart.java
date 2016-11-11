@@ -7,17 +7,23 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.json.JsonFactory;
+import com.google.api.client.util.Base64;
 import com.google.api.client.util.store.FileDataStoreFactory;
 
+import com.google.api.services.gmail.GmailRequest;
 import com.google.api.services.gmail.GmailScopes;
 import com.google.api.services.gmail.model.*;
 import com.google.api.services.gmail.Gmail;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.net.QCodec;
 
+import java.io.Console;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class Quickstart {
     /** Application name. */
@@ -40,11 +46,11 @@ public class Quickstart {
 
     /** Global instance of the scopes required by this quickstart.
      *
-     * If modifying these scopes, delete your previously saved credentials
+     * !!!!!!!!! If modifying these scopes, delete your previously saved credentials
      * at ~/.credentials/gmail-java-quickstart
      */
     private static final List<String> SCOPES =
-        Arrays.asList(GmailScopes.GMAIL_LABELS);
+        Arrays.asList(GmailScopes.GMAIL_MODIFY);
 
     static {
         try {
@@ -63,22 +69,17 @@ public class Quickstart {
      */
     public static Credential authorize() throws IOException {
         // Load client secrets.
-        InputStream in =
-            Quickstart.class.getResourceAsStream("/client_secret.json");
-        GoogleClientSecrets clientSecrets =
-            GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
+        InputStream in = Quickstart.class.getResourceAsStream("/client_secret.json");
+        GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
 
         // Build flow and trigger user authorization request.
-        GoogleAuthorizationCodeFlow flow =
-                new GoogleAuthorizationCodeFlow.Builder(
+        GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
                         HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
                 .setDataStoreFactory(DATA_STORE_FACTORY)
                 .setAccessType("offline")
                 .build();
-        Credential credential = new AuthorizationCodeInstalledApp(
-            flow, new LocalServerReceiver()).authorize("user");
-        System.out.println(
-                "Credentials saved to " + DATA_STORE_DIR.getAbsolutePath());
+        Credential credential = new AuthorizationCodeInstalledApp(flow, new LocalServerReceiver()).authorize("user");
+        System.out.println("Credentials saved to " + DATA_STORE_DIR.getAbsolutePath());
         return credential;
     }
 
@@ -100,16 +101,34 @@ public class Quickstart {
 
         // Print the labels in the user's account.
         String user = "me";
-        ListLabelsResponse listResponse =
-            service.users().labels().list(user).execute();
-        List<Label> labels = listResponse.getLabels();
-        if (labels.size() == 0) {
-            System.out.println("No labels found.");
-        } else {
-            System.out.println("Labels:");
-            for (Label label : labels) {
-                System.out.printf("- %s\n", label.getName());
+
+        ListMessagesResponse response = service
+                .users().messages().list(user)
+                .setQ("in:inbox is:unread")
+                .set("format", "RAW") //TODO investigate why it doesn't work
+                .setMaxResults(10L).execute();
+        for(Message message : response.getMessages()){
+            Message msg = service.users().messages().get(user, message.getId()).execute();
+            msg.getPayload().getHeaders().forEach(h -> {
+                if("Subject".equals(h.getName())){
+                    System.out.println("Subject: " + h.getValue());
+                }
+            });
+
+            if (msg.getPayload().getParts() != null) {
+                msg.getPayload().getParts().stream().forEach(p -> {
+                    if(p.getHeaders().stream()
+                            .filter(v -> "Content-Transfer-Encoding".equals(v.getName()))
+                            .collect(Collectors.toList())
+                            .get(0)
+                            .getValue().equals("quoted-printable")){
+
+                        System.out.println(new String(Base64.decodeBase64(p.getBody().getData())));
+                    }
+                });
             }
+            System.out.println(msg.getSnippet());
+
         }
     }
 
