@@ -67,7 +67,7 @@ public class Quickstart {
      * @return an authorized Credential object.
      * @throws IOException
      */
-    public static Credential authorize() throws IOException {
+    public static Credential authorize(String userId) throws IOException {
         // Load client secrets.
         InputStream in = Quickstart.class.getResourceAsStream("/client_secret.json");
         GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
@@ -78,7 +78,7 @@ public class Quickstart {
                 .setDataStoreFactory(DATA_STORE_FACTORY)
                 .setAccessType("offline")
                 .build();
-        Credential credential = new AuthorizationCodeInstalledApp(flow, new LocalServerReceiver()).authorize("user");
+        Credential credential = new AuthorizationCodeInstalledApp(flow, new LocalServerReceiver()).authorize(userId);
         System.out.println("Credentials saved to " + DATA_STORE_DIR.getAbsolutePath());
         return credential;
     }
@@ -88,27 +88,28 @@ public class Quickstart {
      * @return an authorized Gmail client service
      * @throws IOException
      */
-    public static Gmail getGmailService() throws IOException {
-        Credential credential = authorize();
+    public static Gmail getGmailService(String userId) throws IOException {
+        Credential credential = authorize(userId);
         return new Gmail.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
                 .setApplicationName(APPLICATION_NAME)
                 .build();
     }
 
     public static void main(String[] args) throws IOException {
-        // Build a new authorized API client service.
-        Gmail service = getGmailService();
 
         // Print the labels in the user's account.
-        String user = "me";
+        String userId = "jeckep@gmail.com";
+
+        // Build a new authorized API client service.
+        Gmail service = getGmailService(userId);
 
         ListMessagesResponse response = service
-                .users().messages().list(user)
+                .users().messages().list(userId)
                 .setQ("in:inbox is:unread")
                 .set("format", "RAW") //TODO investigate why it doesn't work
                 .setMaxResults(10L).execute();
         for(Message message : response.getMessages()){
-            Message msg = service.users().messages().get(user, message.getId()).execute();
+            Message msg = service.users().messages().get(userId, message.getId()).execute();
             msg.getPayload().getHeaders().forEach(h -> {
                 if("Subject".equals(h.getName())){
                     System.out.println("Subject: " + h.getValue());
